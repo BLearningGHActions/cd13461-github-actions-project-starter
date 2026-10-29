@@ -43,8 +43,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
+      - name: Install Pagefind binary
+        run: npx pagefind@latest --version
+        
       - name: Run all linters
         run: npm run lint:all
 
@@ -79,7 +82,10 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Install Pagefind binary
+        run: npx pagefind@latest --version
 
       - name: Build static site
         shell: bash
