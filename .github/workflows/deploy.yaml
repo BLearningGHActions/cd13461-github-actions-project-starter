@@ -150,8 +150,8 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
-          DEPLOY_URL: ${{ steps.deployment.outputs.page_url }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.page_url }}
           REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
