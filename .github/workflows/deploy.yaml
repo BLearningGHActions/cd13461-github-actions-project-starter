@@ -1,0 +1,160 @@
+name: "CorpX Pipeline"
+run-name: Executing Pipeline
+on: 
+  push:
+    branches: ["main"]
+    paths-ignore: 
+    - ".gitignore"
+    - "README.md"
+    - "CONTRIBUTING.md"
+    - "LICENSE.txt"
+  pull_request:
+    branches: ["main"]
+    paths-ignore: 
+    - ".gitignore"
+    - "README.md"
+    - "CONTRIBUTING.md"
+    - "LICENSE.txt"
+  workflow_dispatch: 
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+  
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run all linters
+        run: npm run lint:all
+
+      - name: Run repository scripts
+        env:
+          URL_CHECKER_TIMEOUT: ${{ vars.URL_CHECKER_TIMEOUT || 30 }}
+        shell: bash
+        run: |
+          for file in script/*; do
+            if [ -f "$file" ] && [ "${file##*.}" = "js" ]; then
+              node "$file" --timeout "$URL_CHECKER_TIMEOUT" --directory ./src/posts
+            fi
+          done
+              
+  build:    
+    needs: test
+    if: ${{ needs.test.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static site
+        shell: bash
+        env:
+          PATH_PREFIX: '/${{ github.event.repository.name }}/'
+        run: |
+          PATH_PREFIX="$PATH_PREFIX" npm run eleventy:prod
+      
+      - name: Upload built site
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: _site/
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    needs: [test, build]
+    if: >
+      ${{
+        needs.test.result == 'success' &&
+        needs.build.result == 'success' &&
+        github.event_name != 'pull_request' &&
+        (github.event_name != 'workflow_dispatch' || inputs.force_deploy)
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    environment:
+      name: github-pages
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+   
+    steps:
+      - name: Download built site
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Report deployment status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
+          DEPLOY_URL: ${{ steps.deployment.outputs.page_url }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DATE="$(date -u +%F)"
+
+          if [ "$DEPLOY_OUTCOME" = "success" ]; then
+            STATUS="succeeded"
+          else
+            STATUS="failed"
+          fi
+
+          URL="${DEPLOY_URL:-https://${REPOSITORY%%/*}.github.io/${REPOSITORY#*/}/}"
+
+          gh issue create \
+            --repo "$REPOSITORY" \
+            --title "$DATE - Deployment: $STATUS" \
+            --body "URL: $URL"
+            
+      - name: Fail if deployment failed
+        if: ${{ steps.deploy.outcome != 'success' }}
+        run: exit 1
