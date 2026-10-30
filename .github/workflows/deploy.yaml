@@ -60,8 +60,8 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: | 
           #rm -rf node_modules package-lock.json
-          #npm install
-          npm ci 
+          npm install
+          #npm ci 
           npm rebuild sharp
 
       - name: Install Pagefind binary
@@ -113,8 +113,8 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: | 
           #rm -rf node_modules package-lock.json
-          #npm install
-          npm ci
+          npm install
+          #npm ci
           npm rebuild sharp
           #npm rebuild pagefind
 
