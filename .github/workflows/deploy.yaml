@@ -59,9 +59,7 @@ jobs:
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: | 
-          #rm -rf node_modules package-lock.json
           npm install
-          #npm ci 
           npm rebuild sharp
 
       - name: Install Pagefind binary
@@ -112,11 +110,8 @@ jobs:
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: | 
-          #rm -rf node_modules package-lock.json
           npm install
-          #npm ci
           npm rebuild sharp
-          #npm rebuild pagefind
 
       - name: Install Pagefind binary
         run: npx pagefind@latest --version
